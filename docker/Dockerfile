@@ -2,7 +2,7 @@
 FROM golang:1.10-alpine3.8
 
 
-LABEL AUTHOR=muyouming<muyouming@gmail.com>
+LABEL AUTHOR=garfieldkwong<garfieldkwong@gmail.com>
 
 
 WORKDIR /go/src/app
@@ -38,7 +38,7 @@ run echo fs.inotify.max_user_watches=1048576 | tee -a /etc/sysctl.conf && sysctl
 
 copy . .
 #run go get github.com/muyouming/gphotosuploader
-run nohup bash -c "./cow &" &&  go get github.com/muyouming/gphotosuploader
+run nohup bash -c "./cow &" &&  go get github.com/garfieldkwong/gphotosuploader
 
 
 CMD ["/bin/bash","run.sh"]
