@@ -31,6 +31,7 @@ var (
 	maxConcurrentUploads int
 	eventDelay           time.Duration
 	printVersion         bool
+	patternsToIgnore     utils.PatternsToIgnore
 
 	// Uploader
 	uploader *utils.ConcurrentUploader
@@ -113,6 +114,7 @@ func parseCliArguments() {
 	flag.BoolVar(&watchRecursively, "watchRecursively", true, "Start watching new directories in currently watched directories")
 	delay := flag.Int("eventDelay", 3, "Distance of time to wait to consume different events of the same file (seconds)")
 	flag.BoolVar(&printVersion, "version", false, "Print version and commit date")
+	flag.Var(&patternsToIgnore, "ignore", "Patterns to ignore")
 
 	flag.Parse()
 
@@ -174,14 +176,26 @@ func initAuthentication() auth.CookieCredentials {
 	return *credentials
 }
 
+// Check whether the path need to ignore
+func checkIgnore(path string) bool {
+	log.Printf("Checking Ignore: %s", path)
+	for _, pattern := range patternsToIgnore {
+		matched := pattern.MatchString(path)
+		if matched {
+			log.Printf("Ignored %s\n", path)
+			return true
+		}
+	}
+	return false
+}
+
 // Upload all the file and directories passed as arguments, calling filepath.Walk on each name
 func uploadArgumentsFiles() {
 	for _, name := range filesToUpload {
 		filepath.Walk(name, func(path string, file os.FileInfo, err error) error {
-			if (!file.IsDir()) && (!strings.Contains(path,"@eaDir")) {
+			if (!file.IsDir()) && (!checkIgnore(path)) {
 				uploader.EnqueueUpload(path)
 			}
-
 			return nil
 		})
 	}
@@ -220,7 +234,7 @@ func handleUploaderEvents(exiting chan bool) {
 func startToWatch(filePath string, fsWatcher *fsnotify.Watcher) error {
 	if watchRecursively {
 		return filepath.Walk(filePath, func(path string, file os.FileInfo, err error) error {
-			if (file.IsDir()) && (!strings.Contains(file.Name(),"@eaDir")) {
+			if (file.IsDir()) && (!checkIgnore(path)) {
 				return fsWatcher.Add(path)
 			}
 			return nil
@@ -248,7 +262,7 @@ func handleFileChange(event fsnotify.Event, fsWatcher *fsnotify.Watcher) {
 
 			if info, err := os.Stat(event.Name); err != nil {
 				log.Println(err)
-			} else if !info.IsDir()  && (!strings.Contains(event.Name,"@eaDir")) {
+			} else if !info.IsDir() && (!checkIgnore(event.Name)) {
 
 				// Upload file
 				uploader.EnqueueUpload(event.Name)
