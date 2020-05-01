@@ -236,15 +236,15 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 
 	innerJsonRes, err := jsonparser.GetString(jsonRes, "[0]", "[2]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 	eUrl, err := jsonparser.GetString([]byte(innerJsonRes), "[0]", "[0]", "[1]", "[1]", "[0]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 	u.idToMoveIntoAlbum, err = jsonparser.GetString([]byte(innerJsonRes), "[0]", "[0]", "[1]", "[0]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 
 	if err != nil {
@@ -255,7 +255,7 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 }
 
 func unexpectedResponse(err string) error {
-	return fmt.Errorf("unexpected JSON response structure"+err)
+	return fmt.Errorf("unexpected JSON response structure" + err)
 }
 
 // This method add the image to an existing album given the id
@@ -372,12 +372,12 @@ func (u *Upload) createAlbum(albumName string) (string, error) {
 
 	innerJsonRes, err := jsonparser.GetString(jsonRes, "[0]", "[2]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 
 	albumId, err := jsonparser.GetString([]byte(innerJsonRes), "[0]", "[0]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 
 	return albumId, nil
