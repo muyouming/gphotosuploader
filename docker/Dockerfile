@@ -40,5 +40,6 @@ copy . .
 #run go get github.com/muyouming/gphotosuploader
 run nohup bash -c "./cow &" &&  go get github.com/garfieldkwong/gphotosuploader
 
+env IGNORE_PATTERN='^.*/\.@__thumb/.*$'
 
 CMD ["/bin/bash","run.sh"]

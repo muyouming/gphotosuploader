@@ -178,7 +178,6 @@ func initAuthentication() auth.CookieCredentials {
 
 // Check whether the path need to ignore
 func checkIgnore(path string) bool {
-	log.Printf("Checking Ignore: %s", path)
 	for _, pattern := range patternsToIgnore {
 		matched := pattern.MatchString(path)
 		if matched {
