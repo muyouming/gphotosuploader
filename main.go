@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/muyouming/gphotosuploader/api"
-	"github.com/muyouming/gphotosuploader/auth"
-	"github.com/muyouming/gphotosuploader/utils"
-	"github.com/muyouming/gphotosuploader/version"
+	"github.com/garfieldkwong/gphotosuploader/api"
+	"github.com/garfieldkwong/gphotosuploader/auth"
+	"github.com/garfieldkwong/gphotosuploader/utils"
+	"github.com/garfieldkwong/gphotosuploader/version"
 )
 
 var (
