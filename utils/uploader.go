@@ -74,6 +74,7 @@ func (u *ConcurrentUploader) AddUploadedFiles(files ...string) {
 // Due to the fact that this method is asynchronous, if nil is return it doesn't mean the the upload was completed:
 // for that use the Errors and CompletedUploads channels
 func (u *ConcurrentUploader) EnqueueUpload(filePath string) error {
+	fmt.Errorf("Enqueue upload: %s", filePath)
 	if u.waiting {
 		return fmt.Errorf("can't add new uploads while waiting queued uploads to finish")
 	}
@@ -116,7 +117,10 @@ func (u *ConcurrentUploader) wasFileAlreadyUploaded(filePath string) bool {
 
 func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
 	started <- true
+	log.Printf("uploader: %s waiting for upload\n", filePath)
 	u.joinGroupAndWaitForTurn()
+
+	log.Printf("uploader: %s start to uppload\n", filePath)
 
 	// Open the file
 	file, err := os.Open(filePath)
@@ -153,6 +157,8 @@ func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
 		u.uploadedFiles[filePath] = true
 		u.CompletedUploads <- filePath
 	}
+
+	log.Printf("uploader: %s upload finished\n", filePath)
 
 	u.leaveGroupAndNotifyNextUpload()
 }
