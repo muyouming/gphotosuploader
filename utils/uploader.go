@@ -119,6 +119,7 @@ func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
 	started <- true
 	log.Printf("uploader: %s waiting for upload\n", filePath)
 	u.joinGroupAndWaitForTurn()
+	defer u.leaveGroupAndNotifyNextUpload()
 
 	log.Printf("uploader: %s start to uppload\n", filePath)
 
@@ -159,8 +160,6 @@ func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
 	}
 
 	log.Printf("uploader: %s upload finished\n", filePath)
-
-	u.leaveGroupAndNotifyNextUpload()
 }
 
 func (u *ConcurrentUploader) sendError(filePath string, err error) {
