@@ -106,10 +106,11 @@ func getImageIDFromURL(URL string) (string, error) {
 }
 
 type UploadResult struct {
-	Uploaded bool
-	ImageID  string
-	ImageUrl string
-	AlbumID  string
+	Uploaded  bool
+	ImageID   string
+	ImageUrl  string
+	AlbumID   string
+	Timestamp int64
 }
 
 func (ur *UploadResult) URLString() string {
@@ -131,7 +132,7 @@ func (u *Upload) Upload() (*UploadResult, error) {
 	}
 
 	// Enable the photo
-	uploadedImageURL, err := u.enablePhoto(token)
+	uploadedImageURL, timestamp, err := u.enablePhoto(token)
 	if err != nil {
 		log.Println("[WARNING] The file has been uploaded, but the image url in the reply was not found. The image may not appear.")
 		return &UploadResult{
@@ -159,18 +160,20 @@ func (u *Upload) Upload() (*UploadResult, error) {
 		if err != nil {
 			log.Println("[WARNING] the file has been uploaded, but the album hasn't been created.")
 			return &UploadResult{
-				Uploaded: true,
-				ImageID:  uploadedImageID,
-				ImageUrl: uploadedImageURL,
+				Uploaded:  true,
+				ImageID:   uploadedImageID,
+				ImageUrl:  uploadedImageURL,
+				Timestamp: timestamp,
 			}, err
 		}
 	}
 
 	// No errors, image uploaded!
 	return &UploadResult{
-		Uploaded: true,
-		ImageID:  uploadedImageID,
-		ImageUrl: uploadedImageURL,
-		AlbumID:  createdAlbumID,
+		Uploaded:  true,
+		ImageID:   uploadedImageID,
+		ImageUrl:  uploadedImageURL,
+		AlbumID:   createdAlbumID,
+		Timestamp: timestamp,
 	}, nil
 }
