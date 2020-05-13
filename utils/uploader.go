@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/garfieldkwong/gphotosuploader/api"
 	"github.com/garfieldkwong/gphotosuploader/auth"
+	"github.com/garfieldkwong/gphotosuploader/orm"
+	"github.com/garfieldkwong/gphotosuploader/orm/models"
 )
 
 // Simple client used to implement the tool that can upload multiple photos or videos at once
@@ -54,19 +57,10 @@ func NewUploader(credentials auth.CookieCredentials, albumId string, albumName s
 
 		concurrentLimiter: make(chan bool, maxConcurrentUploads),
 
-		uploadedFiles: make(map[string]bool),
-
 		CompletedUploads: make(chan string),
 		IgnoredUploads:   make(chan string),
 		Errors:           make(chan error),
 	}, nil
-}
-
-// Add files to the list of already uploaded files
-func (u *ConcurrentUploader) AddUploadedFiles(files ...string) {
-	for _, name := range files {
-		u.uploadedFiles[name] = true
-	}
 }
 
 // Enqueue a new upload. You must not call this method while waiting for some uploads to finish (The method return an
@@ -89,14 +83,17 @@ func (u *ConcurrentUploader) EnqueueUpload(filePath string) error {
 		}
 	}
 
-	if u.wasFileAlreadyUploaded(filePath) {
+	var file models.File
+	orm.GetInstance().Connection.Where(&models.File{Path: filePath}).FirstOrCreate(&file)
+
+	if file.Status == models.FileSuccess {
 		u.IgnoredUploads <- filePath
 		return nil
 	}
 
 	// Check if the file is an image or a video
 	if valid, err := IsImageOrVideo(filePath); err != nil {
-		u.sendError(filePath, err)
+		u.sendError(&file, err)
 		return nil
 	} else if !valid {
 		u.IgnoredUploads <- filePath
@@ -104,29 +101,24 @@ func (u *ConcurrentUploader) EnqueueUpload(filePath string) error {
 	}
 
 	started := make(chan bool)
-	go u.uploadFile(filePath, started)
+	go u.uploadFile(&file, started)
 	<-started
 
 	return nil
 }
 
-func (u *ConcurrentUploader) wasFileAlreadyUploaded(filePath string) bool {
-	_, uploaded := u.uploadedFiles[filePath]
-	return uploaded
-}
-
-func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
+func (u *ConcurrentUploader) uploadFile(fileModel *models.File, started chan bool) {
 	started <- true
-	log.Printf("uploader: %s waiting for upload\n", filePath)
+	log.Printf("uploader: %s waiting for upload\n", fileModel.Path)
 	u.joinGroupAndWaitForTurn()
 	defer u.leaveGroupAndNotifyNextUpload()
 
-	log.Printf("uploader: %s start to uppload\n", filePath)
+	log.Printf("uploader: %s start to uppload\n", fileModel.Path)
 
 	// Open the file
-	file, err := os.Open(filePath)
+	file, err := os.Open(fileModel.Path)
 	if err != nil {
-		u.sendError(filePath, err)
+		u.sendError(fileModel, err)
 		return
 	}
 	defer file.Close()
@@ -134,7 +126,7 @@ func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
 	// Create options
 	options, err := api.NewUploadOptionsFromFile(file)
 	if err != nil {
-		u.sendError(filePath, err)
+		u.sendError(fileModel, err)
 		return
 	}
 	options.AlbumId = u.albumId
@@ -143,27 +135,32 @@ func (u *ConcurrentUploader) uploadFile(filePath string, started chan bool) {
 	// Create a new upload
 	upload, err := api.NewUpload(options, u.credentials)
 	if err != nil {
-		u.sendError(filePath, err)
+		u.sendError(fileModel, err)
 		return
 	}
 
 	// Try to upload the image
 	if uploadRes, err := upload.Upload(); err != nil {
-		u.sendError(filePath, err)
+		u.sendError(fileModel, err)
 	} else {
 		if uploadRes.AlbumID != "" {
 			u.albumId = uploadRes.AlbumID
 			u.albumName = ""
 		}
-		u.uploadedFiles[filePath] = true
-		u.CompletedUploads <- filePath
+		fileModel.Status = models.FileSuccess
+		fileModel.URL = uploadRes.ImageUrl
+		fileModel.SortAt = time.Unix(uploadRes.Timestamp/1000, uploadRes.Timestamp%1000)
+		orm.GetInstance().Connection.Save(fileModel)
+		u.CompletedUploads <- fileModel.Path
 	}
 
-	log.Printf("uploader: %s upload finished\n", filePath)
+	log.Printf("uploader: %s upload finished\n", fileModel.Path)
 }
 
-func (u *ConcurrentUploader) sendError(filePath string, err error) {
-	u.Errors <- fmt.Errorf("Error with '%s': %s\n", filePath, err)
+func (u *ConcurrentUploader) sendError(fileModel *models.File, err error) {
+	fileModel.Status = models.FileFailed
+	orm.GetInstance().Connection.Save(fileModel)
+	u.Errors <- fmt.Errorf("Error with '%s': %s\n", fileModel.Path, err)
 }
 
 func (u *ConcurrentUploader) joinGroupAndWaitForTurn() {

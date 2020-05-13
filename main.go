@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -60,8 +59,6 @@ func main() {
 
 	stopHandler := make(chan bool)
 	go handleUploaderEvents(stopHandler)
-
-	loadAlreadyUploadedFiles()
 
 	// Upload files passed as arguments
 	uploadArgumentsFiles()
@@ -287,18 +284,5 @@ func handleFileSystemEvents(fsWatcher *fsnotify.Watcher, exiting chan bool) {
 			exiting <- true
 			return
 		}
-	}
-}
-
-func loadAlreadyUploadedFiles() {
-	file, err := os.OpenFile(uploadedListFile, os.O_CREATE, 0666)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		uploader.AddUploadedFiles(scanner.Text())
 	}
 }
