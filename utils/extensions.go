@@ -1,13 +1,15 @@
 package utils
 
 import (
-    "strings"
+	"strings"
 )
+
 var supportedExtensions = [...]string{
 	// Images
 	".jpg",
 	".png",
 	".webp",
+	".heic",
 
 	// Raw images
 	".crw",
@@ -43,7 +45,6 @@ var supportedExtensions = [...]string{
 	".mts",
 	".mkv",
 }
-
 
 func isExtensionSupported(toCheck string) bool {
 	for _, extension := range supportedExtensions {

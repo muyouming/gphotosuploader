@@ -84,18 +84,19 @@ func (u *ConcurrentUploader) EnqueueUpload(filePath string) error {
 	}
 
 	var file models.File
-	orm.GetInstance().Connection.Where(&models.File{Path: filePath}).FirstOrCreate(&file)
-
-	if file.Status == models.FileSuccess {
-		u.IgnoredUploads <- filePath
-		return nil
-	}
+	file.Path = filePath
 
 	// Check if the file is an image or a video
 	if valid, err := IsImageOrVideo(filePath); err != nil {
 		u.sendError(&file, err)
 		return nil
 	} else if !valid {
+		u.IgnoredUploads <- filePath
+		return nil
+	}
+
+	orm.GetInstance().Connection.Where(&models.File{Path: filePath}).FirstOrCreate(&file)
+	if file.Status == models.FileSuccess {
 		u.IgnoredUploads <- filePath
 		return nil
 	}
