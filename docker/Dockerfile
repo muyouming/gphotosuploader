@@ -38,7 +38,7 @@ run echo fs.inotify.max_user_watches=1048576 | tee -a /etc/sysctl.conf && sysctl
 
 copy . .
 #run go get github.com/muyouming/gphotosuploader
-run nohup bash -c "./cow &" &&  go get github.com/garfieldkwong/gphotosuploader
+run nohup bash -c "./cow &" && go get -u github.com/jinzhu/gorm && go get github.com/garfieldkwong/gphotosuploader
 
 env IGNORE_PATTERN='^.*/\.@__thumb/.*$'
 
