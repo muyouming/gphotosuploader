@@ -11,7 +11,7 @@ WORKDIR /go/src/app
 
 #RUN echo "socks5 192.168.1.25 1080" >> /etc/proxychains.conf
 
-run apk add curl wget
+run apk add curl wget gcc
 
 #run wget https://github.com/cyfdecyf/cow/releases/download/0.9.8/cow-linux64-0.9.8.gz
 
