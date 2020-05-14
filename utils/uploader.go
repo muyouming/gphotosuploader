@@ -159,8 +159,10 @@ func (u *ConcurrentUploader) uploadFile(fileModel *models.File, started chan boo
 }
 
 func (u *ConcurrentUploader) sendError(fileModel *models.File, err error) {
-	fileModel.Status = models.FileFailed
-	orm.GetInstance().Connection.Save(fileModel)
+	if fileModel.ID != 0 {
+		fileModel.Status = models.FileFailed
+		orm.GetInstance().Connection.Save(fileModel)
+	}
 	u.Errors <- fmt.Errorf("Error with '%s': %s\n", fileModel.Path, err)
 }
 

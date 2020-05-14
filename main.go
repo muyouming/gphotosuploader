@@ -14,6 +14,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/garfieldkwong/gphotosuploader/api"
 	"github.com/garfieldkwong/gphotosuploader/auth"
+	"github.com/garfieldkwong/gphotosuploader/orm"
+	"github.com/garfieldkwong/gphotosuploader/orm/models"
 	"github.com/garfieldkwong/gphotosuploader/utils"
 	"github.com/garfieldkwong/gphotosuploader/version"
 )
@@ -31,6 +33,7 @@ var (
 	eventDelay           time.Duration
 	printVersion         bool
 	patternsToIgnore     utils.PatternsToIgnore
+	reuploadFailed       bool
 
 	// Uploader
 	uploader *utils.ConcurrentUploader
@@ -62,6 +65,8 @@ func main() {
 
 	// Upload files passed as arguments
 	uploadArgumentsFiles()
+
+	reuploadFailedFiles()
 
 	// Wait until all the uploads are completed
 	uploader.WaitUploadsCompleted()
@@ -112,6 +117,7 @@ func parseCliArguments() {
 	delay := flag.Int("eventDelay", 3, "Distance of time to wait to consume different events of the same file (seconds)")
 	flag.BoolVar(&printVersion, "version", false, "Print version and commit date")
 	flag.Var(&patternsToIgnore, "ignore", "Patterns to ignore")
+	flag.BoolVar(&reuploadFailed, "reupload", false, "Re-upload the failed files")
 
 	flag.Parse()
 
@@ -194,6 +200,16 @@ func uploadArgumentsFiles() {
 			}
 			return nil
 		})
+	}
+}
+
+func reuploadFailedFiles() {
+	if reuploadFailed {
+		var files []models.File
+		orm.GetInstance().Connection.Not(models.File{Status: models.FileSuccess}).Find(&files)
+		for _, f := range files {
+			uploader.EnqueueUpload(f.Path)
+		}
 	}
 }
 
