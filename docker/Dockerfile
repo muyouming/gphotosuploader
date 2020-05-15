@@ -15,7 +15,7 @@ RUN apk add bash
 
 ENV COOKIES=Please_insert_cookies
 
-ADD run.sh
+ADD run.sh .
 
 #run go get github.com/muyouming/gphotosuploader
 RUN go get -u github.com/jinzhu/gorm && go get github.com/garfieldkwong/gphotosuploader
