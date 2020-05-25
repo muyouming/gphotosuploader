@@ -29,6 +29,8 @@ func GetInstance() *DB {
 		if err != nil {
 			panic("failed to connect database")
 		}
+		instance.Connection.LogMode(true)
+
 	})
 
 	return instance
