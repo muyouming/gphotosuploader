@@ -21,7 +21,7 @@ func GetInstance() *DB {
 	once.Do(func() {
 		instance = &DB{}
 		var err error
-		instance.Connection, err = gorm.Open("sqlite3", "./db.sqlite3?loc=UTC")
+		instance.Connection, err = gorm.Open("sqlite3", "/db/db.sqlite3?loc=UTC")
 		if err != nil {
 			panic("failed to connect database")
 		}
