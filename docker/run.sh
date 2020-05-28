@@ -2,9 +2,8 @@
 
 echo fs.inotify.max_user_watches=1048576 | tee -a /etc/sysctl.conf && sysctl -p
 echo "${COOKIES}" >> /go/src/app/auth.json
-ignore_patterns=(${IGNORE_PATTERN})
 ignore_arg=''
-for val in "${ignore_patterns}"
+for val in ${IGNORE_PATTERN}
 do
     ignore_arg="$ignore_arg --ignore $val"
 done
