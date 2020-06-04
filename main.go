@@ -27,7 +27,6 @@ var (
 	directoriesToWatch   utils.DirectoriesToWatch
 	albumId              string
 	albumName            string
-	uploadedListFile     string
 	watchRecursively     bool
 	maxConcurrentUploads int
 	eventDelay           time.Duration
@@ -110,7 +109,6 @@ func parseCliArguments() {
 	flag.Var(&filesToUpload, "upload", "File or directory to upload")
 	flag.StringVar(&albumId, "album", "", "Use this parameter to move new images to a specific album")
 	flag.StringVar(&albumName, "albumName", "", "Use this parameter to move new images to a new album")
-	flag.StringVar(&uploadedListFile, "uploadedList", "uploaded.txt", "List to already uploaded files")
 	flag.IntVar(&maxConcurrentUploads, "maxConcurrent", 1, "Number of max concurrent uploads")
 	flag.Var(&directoriesToWatch, "watch", "Directory to watch")
 	flag.BoolVar(&watchRecursively, "watchRecursively", true, "Start watching new directories in currently watched directories")
@@ -219,14 +217,6 @@ func handleUploaderEvents(exiting chan bool) {
 		case info := <-uploader.CompletedUploads:
 			uploadedFilesCount++
 			log.Printf("Upload of '%v' completed\n", info)
-
-			// Update the upload completed file
-			if file, err := os.OpenFile(uploadedListFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666); err != nil {
-				log.Println("Can't update the uploaded file list")
-			} else {
-				file.WriteString(info + "\n")
-				file.Close()
-			}
 
 		case info := <-uploader.IgnoredUploads:
 			ignoredCount++
