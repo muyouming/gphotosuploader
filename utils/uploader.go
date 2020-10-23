@@ -101,6 +101,8 @@ func (u *ConcurrentUploader) EnqueueUpload(filePath string) error {
 		return nil
 	}
 
+	orm.GetInstance().Connection.Save(file)
+
 	started := make(chan bool)
 	go u.uploadFile(&file, started)
 	<-started
