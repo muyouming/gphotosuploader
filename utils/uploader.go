@@ -85,6 +85,12 @@ func (u *ConcurrentUploader) EnqueueUpload(filePath string) error {
 
 	var file models.File
 	file.Path = filePath
+	md5Val, err := hash_file_md5(filePath)
+	if err != nil {
+		u.sendError(&file, err)
+		return nil
+	}
+	file.MD5 = md5Val
 
 	// Check if the file is an image or a video
 	if valid, err := IsImageOrVideo(filePath); err != nil {
