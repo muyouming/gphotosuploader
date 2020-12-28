@@ -8,4 +8,4 @@ do
     ignore_arg="$ignore_arg --ignore $val"
 done
 echo "Run gphotosUploader $ignore_arg"
-/bin/bash -c "/go/bin/gphotosuploader --watch /photo --maxConcurrent 4 $ignore_arg" 
+/bin/bash -c "/go/bin/uploader --watch /photo --maxConcurrent 4 $ignore_arg" 
