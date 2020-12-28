@@ -37,5 +37,5 @@ type File struct {
 	Status FileStatus `gorm:"type:INTEGER"`
 	URL    string     `gorm:"default:NULL"`
 	SortAt time.Time  `gorm:"default:NULL"`
-	MD5    string     `gorm:"type:VARCHAR(32);unique_index"`
+	MD5    string     `gorm:"type:VARCHAR(32);unique_index;default:NULL"`
 }
