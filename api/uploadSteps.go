@@ -168,7 +168,7 @@ func (u *Upload) uploadFile() (token string, err error) {
 }
 
 // Request that enables the image once it gets uploaded
-func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err error) {
+func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, timestamp int64, err error) {
 
 	innerJson := []interface{}{
 		[]interface{}{
@@ -181,7 +181,7 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 	}
 	innerJsonStr, err := json.Marshal(innerJson)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	jsonReq := []interface{}{
@@ -197,7 +197,7 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 
 	jsonStr, err := json.Marshal(jsonReq)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	// Form that contains the two request field
@@ -212,7 +212,7 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 	// Create the request
 	req, err := http.NewRequest("POST", EnablePhotoUrl, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("can't create the request to enable the image: %v", err.Error())
+		return "", 0, fmt.Errorf("can't create the request to enable the image: %v", err.Error())
 	}
 
 	// Add headers
@@ -221,14 +221,14 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 	// Send the request
 	res, err := u.Credentials.Client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error during the request to enable the image: %v", err.Error())
+		return "", 0, fmt.Errorf("error during the request to enable the image: %v", err.Error())
 	}
 	defer res.Body.Close()
 
 	// Read the response as a string
 	jsonRes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", responseReadingError()
+		return "", 0, responseReadingError()
 	}
 
 	// Skip first characters which are not valid json
@@ -236,26 +236,32 @@ func (u *Upload) enablePhoto(uploadTokenBase64 string) (enabledUrl string, err e
 
 	innerJsonRes, err := jsonparser.GetString(jsonRes, "[0]", "[2]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", 0, unexpectedResponse(string(jsonRes))
 	}
 	eUrl, err := jsonparser.GetString([]byte(innerJsonRes), "[0]", "[0]", "[1]", "[1]", "[0]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", 0, unexpectedResponse(string(jsonRes))
 	}
+
+	ts, err := jsonparser.GetInt([]byte(innerJsonRes), "[0]", "[0]", "[1]", "[2]")
+	if err != nil {
+		return "", 0, unexpectedResponse(string(jsonRes))
+	}
+
 	u.idToMoveIntoAlbum, err = jsonparser.GetString([]byte(innerJsonRes), "[0]", "[0]", "[1]", "[0]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", 0, unexpectedResponse(string(jsonRes))
 	}
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	return eUrl, nil
+	return eUrl, ts, nil
 }
 
 func unexpectedResponse(err string) error {
-	return fmt.Errorf("unexpected JSON response structure"+err)
+	return fmt.Errorf("unexpected JSON response structure" + err)
 }
 
 // This method add the image to an existing album given the id
@@ -372,12 +378,12 @@ func (u *Upload) createAlbum(albumName string) (string, error) {
 
 	innerJsonRes, err := jsonparser.GetString(jsonRes, "[0]", "[2]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 
 	albumId, err := jsonparser.GetString([]byte(innerJsonRes), "[0]", "[0]")
 	if err != nil {
-		return "", unexpectedResponse(jsonRes)
+		return "", unexpectedResponse(string(jsonRes))
 	}
 
 	return albumId, nil

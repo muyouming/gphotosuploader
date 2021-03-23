@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -13,10 +12,12 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/muyouming/gphotosuploader/api"
-	"github.com/muyouming/gphotosuploader/auth"
-	"github.com/muyouming/gphotosuploader/utils"
-	"github.com/muyouming/gphotosuploader/version"
+	"github.com/garfieldkwong/gphotosuploader/api"
+	"github.com/garfieldkwong/gphotosuploader/auth"
+	"github.com/garfieldkwong/gphotosuploader/orm"
+	"github.com/garfieldkwong/gphotosuploader/orm/models"
+	"github.com/garfieldkwong/gphotosuploader/utils"
+	"github.com/garfieldkwong/gphotosuploader/version"
 )
 
 var (
@@ -26,11 +27,12 @@ var (
 	directoriesToWatch   utils.DirectoriesToWatch
 	albumId              string
 	albumName            string
-	uploadedListFile     string
 	watchRecursively     bool
 	maxConcurrentUploads int
 	eventDelay           time.Duration
 	printVersion         bool
+	patternsToIgnore     utils.PatternsToIgnore
+	reuploadFailed       bool
 
 	// Uploader
 	uploader *utils.ConcurrentUploader
@@ -60,10 +62,10 @@ func main() {
 	stopHandler := make(chan bool)
 	go handleUploaderEvents(stopHandler)
 
-	loadAlreadyUploadedFiles()
-
 	// Upload files passed as arguments
 	uploadArgumentsFiles()
+
+	reuploadFailedFiles()
 
 	// Wait until all the uploads are completed
 	uploader.WaitUploadsCompleted()
@@ -107,12 +109,13 @@ func parseCliArguments() {
 	flag.Var(&filesToUpload, "upload", "File or directory to upload")
 	flag.StringVar(&albumId, "album", "", "Use this parameter to move new images to a specific album")
 	flag.StringVar(&albumName, "albumName", "", "Use this parameter to move new images to a new album")
-	flag.StringVar(&uploadedListFile, "uploadedList", "uploaded.txt", "List to already uploaded files")
 	flag.IntVar(&maxConcurrentUploads, "maxConcurrent", 1, "Number of max concurrent uploads")
 	flag.Var(&directoriesToWatch, "watch", "Directory to watch")
 	flag.BoolVar(&watchRecursively, "watchRecursively", true, "Start watching new directories in currently watched directories")
 	delay := flag.Int("eventDelay", 3, "Distance of time to wait to consume different events of the same file (seconds)")
 	flag.BoolVar(&printVersion, "version", false, "Print version and commit date")
+	flag.Var(&patternsToIgnore, "ignore", "Patterns to ignore")
+	flag.BoolVar(&reuploadFailed, "reupload", false, "Re-upload the failed files")
 
 	flag.Parse()
 
@@ -174,16 +177,37 @@ func initAuthentication() auth.CookieCredentials {
 	return *credentials
 }
 
+// Check whether the path need to ignore
+func checkIgnore(path string) bool {
+	for _, pattern := range patternsToIgnore {
+		matched := pattern.MatchString(path)
+		if matched {
+			log.Printf("Ignored %s\n", path)
+			return true
+		}
+	}
+	return false
+}
+
 // Upload all the file and directories passed as arguments, calling filepath.Walk on each name
 func uploadArgumentsFiles() {
 	for _, name := range filesToUpload {
 		filepath.Walk(name, func(path string, file os.FileInfo, err error) error {
-			if (!file.IsDir()) && (!strings.Contains(path,"@eaDir")) {
+			if (!file.IsDir()) && (!checkIgnore(path)) {
 				uploader.EnqueueUpload(path)
 			}
-
 			return nil
 		})
+	}
+}
+
+func reuploadFailedFiles() {
+	if reuploadFailed {
+		var files []models.File
+		orm.GetInstance().Connection.Not(models.File{Status: models.FileSuccess}).Find(&files)
+		for _, f := range files {
+			uploader.EnqueueUpload(f.Path)
+		}
 	}
 }
 
@@ -193,14 +217,6 @@ func handleUploaderEvents(exiting chan bool) {
 		case info := <-uploader.CompletedUploads:
 			uploadedFilesCount++
 			log.Printf("Upload of '%v' completed\n", info)
-
-			// Update the upload completed file
-			if file, err := os.OpenFile(uploadedListFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666); err != nil {
-				log.Println("Can't update the uploaded file list")
-			} else {
-				file.WriteString(info + "\n")
-				file.Close()
-			}
 
 		case info := <-uploader.IgnoredUploads:
 			ignoredCount++
@@ -220,7 +236,7 @@ func handleUploaderEvents(exiting chan bool) {
 func startToWatch(filePath string, fsWatcher *fsnotify.Watcher) error {
 	if watchRecursively {
 		return filepath.Walk(filePath, func(path string, file os.FileInfo, err error) error {
-			if (file.IsDir()) && (!strings.Contains(file.Name(),"@eaDir")) {
+			if (file.IsDir()) && (!checkIgnore(path)) {
 				return fsWatcher.Add(path)
 			}
 			return nil
@@ -248,7 +264,7 @@ func handleFileChange(event fsnotify.Event, fsWatcher *fsnotify.Watcher) {
 
 			if info, err := os.Stat(event.Name); err != nil {
 				log.Println(err)
-			} else if !info.IsDir()  && (!strings.Contains(event.Name,"@eaDir")) {
+			} else if !info.IsDir() && (!checkIgnore(event.Name)) {
 
 				// Upload file
 				uploader.EnqueueUpload(event.Name)
@@ -258,6 +274,11 @@ func handleFileChange(event fsnotify.Event, fsWatcher *fsnotify.Watcher) {
 			}
 		})
 		timers[event.Name] = timer
+	} else if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
+		var file models.File
+		orm.GetInstance().Connection.Where(&models.File{Path: event.Name}).FirstOrCreate(&file)
+		orm.GetInstance().Connection.Unscoped().Delete(&file)
+		fmt.Printf("Deleted record: %s\n", event.Name)
 	}
 }
 
@@ -274,18 +295,5 @@ func handleFileSystemEvents(fsWatcher *fsnotify.Watcher, exiting chan bool) {
 			exiting <- true
 			return
 		}
-	}
-}
-
-func loadAlreadyUploadedFiles() {
-	file, err := os.OpenFile(uploadedListFile, os.O_CREATE, 0666)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		uploader.AddUploadedFiles(scanner.Text())
 	}
 }

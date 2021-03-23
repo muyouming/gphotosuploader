@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/muyouming/gphotosuploader/auth"
+	"github.com/garfieldkwong/gphotosuploader/auth"
 	"golang.org/x/net/html"
 )
 
